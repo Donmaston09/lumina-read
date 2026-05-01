@@ -34,6 +34,7 @@ class LuminaApp {
         this.articleContent = document.getElementById('articleContent');
         this.articleSource = document.getElementById('articleSource');
         this.articleReadingTime = document.getElementById('articleReadingTime');
+        this.translateOverlay = document.getElementById('translateOverlay');
         this.playerBar = document.getElementById('playerBar');
         this.playerTitle = document.getElementById('playerTitle');
         this.playerAuthor = document.getElementById('playerAuthor');
@@ -74,8 +75,12 @@ class LuminaApp {
         // Translation
         this.translateBtn.addEventListener('click', () => this.handleTranslate());
         this.langSelect.addEventListener('change', () => {
-            if (this.langSelect.value === 'en' && this.currentArticle && this.currentArticle.originalText) {
-                this.restoreOriginal();
+            if (this.langSelect.value === 'en') {
+                if (this.currentArticle && this.currentArticle.originalText) {
+                    this.restoreOriginal();
+                }
+            } else {
+                this.handleTranslate();
             }
         });
         this.playPauseBtn.addEventListener('click', () => this.togglePlayback());
@@ -279,9 +284,12 @@ class LuminaApp {
     async handleTranslate() {
         if (!this.currentArticle) return this.showToast('Extract an article first');
         const targetLang = this.langSelect.value;
-        if (targetLang === 'en') return this.showToast('Already in English');
+        if (targetLang === 'en') return;
 
+        this.stopSpeech();
+        this.translateOverlay.style.display = 'flex';
         this.setLoading(true, 'translateBtn');
+        
         try {
             // Save original if not already saved
             if (!this.currentArticle.originalText) {
@@ -306,6 +314,7 @@ class LuminaApp {
             this.showToast('Translation failed: ' + error.message);
         } finally {
             this.setLoading(false, 'translateBtn');
+            this.translateOverlay.style.display = 'none';
         }
     }
 
