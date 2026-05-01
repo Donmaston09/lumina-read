@@ -203,7 +203,42 @@ body {
 .app-header {
     padding: 32px 40px;
     display: flex;
-    justify-content: center;
+    flex-direction: column;
+    align-items: center;
+    gap: 20px;
+}
+
+.input-mode-tabs {
+    display: flex;
+    background: rgba(255, 255, 255, 0.05);
+    padding: 4px;
+    border-radius: 30px;
+    border: 1px solid var(--border);
+}
+
+.tab-btn {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    padding: 8px 20px;
+    border-radius: 26px;
+    font-size: 0.85rem;
+    font-weight: 500;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    transition: all 0.2s;
+}
+
+.tab-btn:hover {
+    color: var(--text-secondary);
+}
+
+.tab-btn.active {
+    background: var(--bg-card);
+    color: var(--text-primary);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
 }
 
 .input-container {
@@ -237,6 +272,29 @@ body {
     flex: 1;
     font-size: 0.95rem;
     outline: none;
+    padding: 8px 0;
+}
+
+.btn-clear-input {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    font-size: 1.2rem;
+    cursor: pointer;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    transition: color 0.2s;
+    margin-right: 4px;
+}
+
+.btn-clear-input:hover {
+    color: var(--text-secondary);
+}
+
+.input-container:focus-within .btn-clear-input,
+.input-container:hover .btn-clear-input {
+    display: flex;
 }
 
 .btn-primary {
@@ -262,7 +320,36 @@ body {
     transform: translateY(0);
 }
 
-/* Reader View */
+.btn-primary:disabled {
+    background: var(--bg-dark);
+    color: var(--text-muted);
+    cursor: not-allowed;
+    border: 1px solid var(--border);
+}
+
+.btn-ghost-input {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--border);
+    color: var(--text-secondary);
+    padding: 8px 16px;
+    border-radius: 20px;
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.btn-ghost-input:hover {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.file-name-placeholder {
+    flex: 1;
+    font-size: 0.9rem;
+    color: var(--text-muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
 .reader-view {
     flex: 1;
     overflow-y: auto;

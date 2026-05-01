@@ -17,7 +17,17 @@ class LuminaApp {
 
         // DOM Elements
         this.urlInput = document.getElementById('urlInput');
+        this.clearInputBtn = document.getElementById('clearInputBtn');
         this.extractBtn = document.getElementById('extractBtn');
+        
+        // New File Elements
+        this.tabBtns = document.querySelectorAll('.tab-btn');
+        this.linkInputContainer = document.getElementById('linkInputContainer');
+        this.fileInputContainer = document.getElementById('fileInputContainer');
+        this.fileInput = document.getElementById('fileInput');
+        this.browseBtn = document.getElementById('browseBtn');
+        this.uploadBtn = document.getElementById('uploadBtn');
+        this.fileNameDisplay = document.getElementById('fileNameDisplay');
         this.welcomeView = document.getElementById('welcomeView');
         this.articleDisplay = document.getElementById('articleDisplay');
         this.articleTitle = document.getElementById('articleTitle');
@@ -41,9 +51,23 @@ class LuminaApp {
     }
 
     init() {
+        // Tab Switching
+        this.tabBtns.forEach(btn => {
+            btn.addEventListener('click', () => this.switchMode(btn.dataset.mode));
+        });
+
         // Event Listeners
         this.extractBtn.addEventListener('click', () => this.handleExtract());
         this.urlInput.addEventListener('keypress', (e) => e.key === 'Enter' && this.handleExtract());
+        this.clearInputBtn.addEventListener('click', () => {
+            this.urlInput.value = '';
+            this.urlInput.focus();
+        });
+
+        // File Handlers
+        this.browseBtn.addEventListener('click', () => this.fileInput.click());
+        this.fileInput.addEventListener('change', (e) => this.handleFileSelect(e));
+        this.uploadBtn.addEventListener('click', () => this.handleFileUpload());
         this.playPauseBtn.addEventListener('click', () => this.togglePlayback());
         this.speedBtn.addEventListener('click', () => this.cycleSpeed());
         this.clearLibraryBtn.addEventListener('click', () => this.clearLibrary());
@@ -70,42 +94,75 @@ class LuminaApp {
 
         this.setLoading(true);
         try {
+            console.log(`Attempting to extract: ${url}`);
             const article = await this.fetchArticle(url);
             this.displayArticle(article);
             this.addToLibrary(article);
             this.urlInput.value = '';
+            this.showToast('Article extracted successfully!');
         } catch (error) {
-            console.error(error);
-            this.showToast('Failed to extract article. Try another link.');
+            console.error('Extraction Error:', error);
+            const msg = error.message.includes('CORS') 
+                ? 'Security block: Please run the app from a local server.' 
+                : `Extraction failed: ${error.message}`;
+            this.showToast(msg);
         } finally {
             this.setLoading(false);
         }
     }
 
     async fetchArticle(url) {
-        // Use allorigins proxy to bypass CORS
-        const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`;
-        const response = await fetch(proxyUrl);
-        const data = await response.json();
-        
-        const doc = new DOMParser().parseFromString(data.contents, 'text/html');
-        
-        // Fix relative images/links if needed (optional for TTS but good for visual)
-        const reader = new Readability(doc);
-        const article = reader.parse();
+        // Basic URL validation
+        try { new URL(url); } catch(e) { throw new Error('Invalid URL format'); }
 
-        if (!article || !article.textContent) throw new Error('Could not parse content');
+        const proxies = [
+            (u) => `https://api.allorigins.win/get?url=${encodeURIComponent(u)}`,
+            (u) => `https://api.codetabs.com/v1/proxy?quest=${u}`,
+            (u) => `https://thingproxy.freeboard.io/fetch/${u}`
+        ];
 
-        return {
-            title: article.title,
-            content: article.content,
-            textContent: article.textContent,
-            excerpt: article.excerpt,
-            byline: article.byline || new URL(url).hostname,
-            url: url,
-            siteName: article.siteName || new URL(url).hostname,
-            readingTime: Math.ceil(article.textContent.split(/\s+/).length / 200)
-        };
+        let lastError = null;
+
+        for (const getProxyUrl of proxies) {
+            const proxyUrl = getProxyUrl(url);
+            try {
+                console.log(`Trying proxy: ${proxyUrl}`);
+                const response = await fetch(proxyUrl);
+                
+                if (!response.ok) throw new Error(`Proxy returned ${response.status}`);
+                
+                const data = await response.json();
+                // Handle different proxy response formats
+                const html = data.contents || data.content || data;
+                
+                if (!html) throw new Error('Empty response');
+
+                const doc = new DOMParser().parseFromString(html, 'text/html');
+                const reader = new Readability(doc);
+                const article = reader.parse();
+
+                if (article && article.textContent && article.textContent.length > 100) {
+                    return {
+                        title: article.title,
+                        content: article.content,
+                        textContent: article.textContent,
+                        excerpt: article.excerpt,
+                        byline: article.byline || new URL(url).hostname,
+                        url: url,
+                        siteName: article.siteName || new URL(url).hostname,
+                        readingTime: Math.ceil(article.textContent.split(/\s+/).length / 200)
+                    };
+                }
+            } catch (e) {
+                console.warn(`Proxy failed: ${getProxyUrl.name || 'anonymous'}`, e);
+                lastError = e;
+                if (window.location.protocol === 'file:') {
+                    throw new Error('CORS block: You MUST run this app from a local server (e.g., http://localhost:8000). Browsers block "file://" links from extracting content.');
+                }
+            }
+        }
+
+        throw new Error(lastError ? lastError.message : 'All proxies failed. The website might be blocking extraction.');
     }
 
     displayArticle(article) {
@@ -130,6 +187,81 @@ class LuminaApp {
         
         // Scroll to top
         document.querySelector('.reader-view').scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    // --- File Handling ---
+
+    switchMode(mode) {
+        this.tabBtns.forEach(btn => btn.classList.toggle('active', btn.dataset.mode === mode));
+        this.linkInputContainer.style.display = mode === 'link' ? 'flex' : 'none';
+        this.fileInputContainer.style.display = mode === 'file' ? 'flex' : 'none';
+    }
+
+    handleFileSelect(e) {
+        const file = e.target.files[0];
+        if (file) {
+            this.fileNameDisplay.textContent = file.name;
+            this.uploadBtn.disabled = false;
+        }
+    }
+
+    async handleFileUpload() {
+        const file = this.fileInput.files[0];
+        if (!file) return;
+
+        this.setLoading(true, 'uploadBtn');
+        try {
+            let text = '';
+            const extension = file.name.split('.').pop().toLowerCase();
+
+            if (extension === 'pdf') {
+                text = await this.parsePDF(file);
+            } else if (extension === 'docx') {
+                text = await this.parseDOCX(file);
+            } else {
+                text = await file.text();
+            }
+
+            const article = {
+                title: file.name.replace(/\.[^/.]+$/, ""),
+                content: text.split('\n').map(p => `<p>${p}</p>`).join(''),
+                textContent: text,
+                byline: 'Local File',
+                url: 'file://' + file.name,
+                siteName: 'Document',
+                readingTime: Math.ceil(text.split(/\s+/).length / 200)
+            };
+
+            this.displayArticle(article);
+            this.addToLibrary(article);
+            this.showToast('Document processed successfully!');
+        } catch (error) {
+            console.error(error);
+            this.showToast('Failed to parse file: ' + error.message);
+        } finally {
+            this.setLoading(false, 'uploadBtn');
+        }
+    }
+
+    async parsePDF(file) {
+        const arrayBuffer = await file.arrayBuffer();
+        const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+        let fullText = '';
+        
+        for (let i = 1; i <= pdf.numPages; i++) {
+            const page = await pdf.getPage(i);
+            const content = await page.getTextContent();
+            const pageText = content.items.map(item => item.str).join(' ');
+            fullText += pageText + '\n\n';
+        }
+        
+        return fullText;
+    }
+
+    async parseDOCX(file) {
+        const arrayBuffer = await file.arrayBuffer();
+        const result = await mammoth.extractRawText({ arrayBuffer });
+        return result.value;
     }
 
     // --- TTS Engine ---
@@ -254,17 +386,14 @@ class LuminaApp {
         }
     }
 
-    setLoading(isLoading) {
-        this.extractBtn.disabled = isLoading;
-        this.extractBtn.querySelector('span').textContent = isLoading ? 'Working...' : 'Extract';
-        const icon = this.extractBtn.querySelector('i');
-        icon.className = isLoading ? 'ph ph-circle-notch animate-spin' : 'ph ph-arrow-right';
+    setLoading(isLoading, btnId = 'extractBtn') {
+        const btn = document.getElementById(btnId);
+        btn.disabled = isLoading;
+        btn.querySelector('span').textContent = isLoading ? 'Working...' : (btnId === 'extractBtn' ? 'Extract' : 'Extract Text');
+        const icon = btn.querySelector('i');
+        icon.className = isLoading ? 'ph ph-circle-notch animate-spin' : (btnId === 'extractBtn' ? 'ph ph-arrow-right' : 'ph ph-sparkle');
         
-        if (isLoading) {
-            this.extractBtn.style.opacity = '0.7';
-        } else {
-            this.extractBtn.style.opacity = '1';
-        }
+        btn.style.opacity = isLoading ? '0.7' : '1';
     }
 
     showToast(msg) {
