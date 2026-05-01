@@ -311,16 +311,24 @@ class LuminaApp {
 
     async translateText(text, from, to) {
         // MyMemory API has a limit on text length per request (~500 chars for free).
-        // For premium feel, we split and join.
+        // Providing an email improves rate limits.
         const chunks = this.splitTextIntoChunks(text, 500);
-        const translatedChunks = await Promise.all(chunks.map(async (chunk) => {
-            const url = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(chunk)}&langpair=${from}|${to}`;
-            const response = await fetch(url);
-            const data = await response.json();
-            if (data.responseStatus !== 200) throw new Error(data.responseDetails);
-            return data.responseData.translatedText;
-        }));
-        return translatedChunks.join(' ');
+        const email = 'donmaston09@gmail.com';
+        
+        try {
+            const translatedChunks = await Promise.all(chunks.map(async (chunk) => {
+                const url = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(chunk)}&langpair=${from}|${to}&de=${email}`;
+                const response = await fetch(url);
+                if (!response.ok) throw new Error('Translation service error');
+                const data = await response.json();
+                if (data.responseStatus !== 200) throw new Error(data.responseDetails);
+                return data.responseData.translatedText;
+            }));
+            return translatedChunks.join(' ');
+        } catch (e) {
+            console.error('Translation failed:', e);
+            throw new Error('Translation service is temporarily unavailable or limit reached.');
+        }
     }
 
     splitTextIntoChunks(text, maxSize) {
@@ -448,19 +456,31 @@ class LuminaApp {
 
     loadVoices() {
         const allVoices = this.synth.getVoices();
-        this.voices = allVoices; // Keep reference for index matching
+        // Sort to put high-quality voices first
+        this.voices = allVoices.sort((a, b) => {
+            const aName = a.name.toLowerCase();
+            const bName = b.name.toLowerCase();
+            const aPremium = aName.includes('premium') || aName.includes('neural') || aName.includes('google') || aName.includes('enhanced');
+            const bPremium = bName.includes('premium') || bName.includes('neural') || bName.includes('google') || bName.includes('enhanced');
+            if (aPremium && !bPremium) return -1;
+            if (!aPremium && bPremium) return 1;
+            return 0;
+        });
 
         const groups = {
-            'Nigeria': allVoices.filter(v => v.lang.includes('NG')),
-            'United Kingdom': allVoices.filter(v => v.lang.includes('GB')),
-            'United States': allVoices.filter(v => v.lang.includes('US')),
-            'India': allVoices.filter(v => v.lang.includes('IN')),
-            'French': allVoices.filter(v => v.lang.startsWith('fr')),
-            'Italian': allVoices.filter(v => v.lang.startsWith('it')),
-            'Others': allVoices.filter(v => 
+            'Premium / Neural': this.voices.filter(v => v.name.toLowerCase().includes('premium') || v.name.toLowerCase().includes('neural') || v.name.toLowerCase().includes('google') || v.name.toLowerCase().includes('enhanced')),
+            'Nigeria': this.voices.filter(v => v.lang.includes('NG')),
+            'United Kingdom': this.voices.filter(v => v.lang.includes('GB')),
+            'United States': this.voices.filter(v => v.lang.includes('US')),
+            'India': this.voices.filter(v => v.lang.includes('IN')),
+            'French': this.voices.filter(v => v.lang.startsWith('fr')),
+            'Italian': this.voices.filter(v => v.lang.startsWith('it')),
+            'Hausa/Yoruba': this.voices.filter(v => v.lang.startsWith('ha') || v.lang.startsWith('yo')),
+            'Others': this.voices.filter(v => 
                 !v.lang.includes('NG') && !v.lang.includes('GB') && 
                 !v.lang.includes('US') && !v.lang.includes('IN') &&
                 !v.lang.startsWith('fr') && !v.lang.startsWith('it') &&
+                !v.name.toLowerCase().includes('premium') && !v.name.toLowerCase().includes('neural') &&
                 v.lang.startsWith('en')
             )
         };
