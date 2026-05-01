@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lumina Read — Premium Audio Articles</title>
+    <meta name="description" content="Transform any link into a professional audio experience. Listen to articles while you stay productive.">
+    
+    <!-- Fonts & Icons -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Playfair+Display:ital,wght@0,700;1,700&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    
+    <!-- Readability -->
+    <script src="https://cdn.jsdelivr.net/npm/@mozilla/readability@0.5.0/Readability.min.js"></script>
+    
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="app-shell">
+        <!-- Sidebar / Library -->
+        <aside class="sidebar">
+            <div class="brand">
+                <div class="logo-icon">
+                    <i class="ph-fill ph-waves"></i>
+                </div>
+                <span>Lumina Read</span>
+            </div>
+            
+            <nav class="library-nav">
+                <div class="section-header">
+                    <h3>Library</h3>
+                    <button id="clearLibrary" title="Clear All"><i class="ph ph-trash"></i></button>
+                </div>
+                <div id="libraryList" class="library-list">
+                    <!-- Saved items will appear here -->
+                    <div class="empty-state">
+                        <i class="ph ph-bookmarks"></i>
+                        <p>No saved articles yet</p>
+                    </div>
+                </div>
+            </nav>
+            
+            <div class="sidebar-footer">
+                <div class="creator-info">
+                    <p>Inspired by <strong>Anthony Onoja</strong></p>
+                    <div class="creator-links">
+                        <a href="mailto:donmaston09@gmail.com" title="Email"><i class="ph ph-envelope"></i></a>
+                        <a href="https://paypal.me/Onoja412" target="_blank" title="Support"><i class="ph ph-hand-heart"></i></a>
+                    </div>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <header class="app-header">
+                <div class="input-container">
+                    <i class="ph ph-link"></i>
+                    <input type="url" id="urlInput" placeholder="Paste an article link here..." autocomplete="off">
+                    <button id="extractBtn" class="btn-primary">
+                        <span>Extract</span>
+                        <i class="ph ph-arrow-right"></i>
+                    </button>
+                </div>
+            </header>
+
+            <section class="reader-view" id="readerView">
+                <div class="welcome-view" id="welcomeView">
+                    <h1 class="display-title">Ready to listen?</h1>
+                    <p class="subtitle">Paste a link above to transform any article into a professional audio experience.</p>
+                    <div class="stats-row">
+                        <div class="stat-card">
+                            <i class="ph ph-clock"></i>
+                            <span>Saves 15m/day</span>
+                        </div>
+                        <div class="stat-card">
+                            <i class="ph ph-brain"></i>
+                            <span>Focus Mode</span>
+                        </div>
+                    </div>
+                </div>
+
+                <article class="article-display" id="articleDisplay" style="display: none;">
+                    <div class="article-meta">
+                        <span id="articleSource" class="source-tag">source.com</span>
+                        <span id="articleReadingTime" class="time-tag">8 min read</span>
+                    </div>
+                    <h1 id="articleTitle" class="article-title">The Future of Productivity is Audio</h1>
+                    <div id="articleContent" class="article-text">
+                        <!-- Content goes here -->
+                    </div>
+                </article>
+            </section>
+
+            <!-- Floating Player -->
+            <div class="player-bar" id="playerBar">
+                <div class="player-info">
+                    <div class="player-art" id="playerArt">
+                        <i class="ph ph-article"></i>
+                    </div>
+                    <div class="player-text">
+                        <h4 id="playerTitle">Select an article</h4>
+                        <p id="playerAuthor">Ready to read</p>
+                    </div>
+                </div>
+
+                <div class="player-controls">
+                    <div class="control-row">
+                        <button class="btn-icon" id="rewindBtn" title="Rewind 10s"><i class="ph ph-rewind-circle"></i></button>
+                        <button class="btn-play" id="playPauseBtn"><i class="ph-fill ph-play"></i></button>
+                        <button class="btn-icon" id="skipBtn" title="Forward 10s"><i class="ph ph-fast-forward-circle"></i></button>
+                    </div>
+                    <div class="progress-row">
+                        <span class="time-stamp" id="currentTime">0:00</span>
+                        <div class="progress-track" id="progressTrack">
+                            <div class="progress-fill" id="progressFill"></div>
+                        </div>
+                        <span class="time-stamp" id="totalTime">0:00</span>
+                    </div>
+                </div>
+
+                <div class="player-settings">
+                    <button class="btn-chip" id="speedBtn">1.0x</button>
+                    <div class="voice-picker">
+                        <i class="ph ph-speaker-high"></i>
+                        <select id="voiceSelect">
+                            <option>System Default</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <!-- Visualizer Overlay -->
+                <div class="visualizer" id="visualizer">
+                    <div class="bar"></div>
+                    <div class="bar"></div>
+                    <div class="bar"></div>
+                    <div class="bar"></div>
+                    <div class="bar"></div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Notifications -->
+    <div id="toast" class="toast"></div>
+
+    <script src="app.js"></script>
+</body>
+</html>
