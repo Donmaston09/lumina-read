@@ -42,6 +42,8 @@ class LuminaApp {
         this.currentTime = document.getElementById('currentTime');
         this.totalTime = document.getElementById('totalTime');
         this.voiceSelect = document.getElementById('voiceSelect');
+        this.langSelect = document.getElementById('langSelect');
+        this.translateBtn = document.getElementById('translateBtn');
         this.speedBtn = document.getElementById('speedBtn');
         this.libraryList = document.getElementById('libraryList');
         this.clearLibraryBtn = document.getElementById('clearLibrary');
@@ -68,6 +70,14 @@ class LuminaApp {
         this.browseBtn.addEventListener('click', () => this.fileInput.click());
         this.fileInput.addEventListener('change', (e) => this.handleFileSelect(e));
         this.uploadBtn.addEventListener('click', () => this.handleFileUpload());
+        
+        // Translation
+        this.translateBtn.addEventListener('click', () => this.handleTranslate());
+        this.langSelect.addEventListener('change', () => {
+            if (this.langSelect.value === 'en' && this.currentArticle && this.currentArticle.originalText) {
+                this.restoreOriginal();
+            }
+        });
         this.playPauseBtn.addEventListener('click', () => this.togglePlayback());
         this.speedBtn.addEventListener('click', () => this.cycleSpeed());
         this.clearLibraryBtn.addEventListener('click', () => this.clearLibrary());
@@ -264,6 +274,80 @@ class LuminaApp {
         return result.value;
     }
 
+    // --- Translation ---
+
+    async handleTranslate() {
+        if (!this.currentArticle) return this.showToast('Extract an article first');
+        const targetLang = this.langSelect.value;
+        if (targetLang === 'en') return this.showToast('Already in English');
+
+        this.setLoading(true, 'translateBtn');
+        try {
+            // Save original if not already saved
+            if (!this.currentArticle.originalText) {
+                this.currentArticle.originalText = this.currentArticle.textContent;
+                this.currentArticle.originalTitle = this.currentArticle.title;
+            }
+
+            const translatedText = await this.translateText(this.currentArticle.originalText, 'en', targetLang);
+            const translatedTitle = await this.translateText(this.currentArticle.originalTitle, 'en', targetLang);
+
+            this.currentArticle.title = translatedTitle;
+            this.currentArticle.textContent = translatedText;
+            this.currentArticle.content = translatedText.split('\n').map(p => `<p>${p}</p>`).join('');
+
+            this.displayArticle(this.currentArticle);
+            this.showToast(`Translated to ${this.langSelect.options[this.langSelect.selectedIndex].text}`);
+            
+            // Auto-select a voice for the target language
+            this.autoSelectVoice(targetLang);
+        } catch (error) {
+            console.error(error);
+            this.showToast('Translation failed: ' + error.message);
+        } finally {
+            this.setLoading(false, 'translateBtn');
+        }
+    }
+
+    async translateText(text, from, to) {
+        // MyMemory API has a limit on text length per request (~500 chars for free).
+        // For premium feel, we split and join.
+        const chunks = this.splitTextIntoChunks(text, 500);
+        const translatedChunks = await Promise.all(chunks.map(async (chunk) => {
+            const url = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(chunk)}&langpair=${from}|${to}`;
+            const response = await fetch(url);
+            const data = await response.json();
+            if (data.responseStatus !== 200) throw new Error(data.responseDetails);
+            return data.responseData.translatedText;
+        }));
+        return translatedChunks.join(' ');
+    }
+
+    splitTextIntoChunks(text, maxSize) {
+        const chunks = [];
+        let i = 0;
+        while (i < text.length) {
+            chunks.push(text.slice(i, i + maxSize));
+            i += maxSize;
+        }
+        return chunks;
+    }
+
+    restoreOriginal() {
+        this.currentArticle.title = this.currentArticle.originalTitle;
+        this.currentArticle.textContent = this.currentArticle.originalText;
+        this.currentArticle.content = this.currentArticle.originalText.split('\n').map(p => `<p>${p}</p>`).join('');
+        this.displayArticle(this.currentArticle);
+        this.showToast('Restored original English');
+    }
+
+    autoSelectVoice(langCode) {
+        const voiceIdx = this.voices.findIndex(v => v.lang.startsWith(langCode));
+        if (voiceIdx !== -1) {
+            this.voiceSelect.value = voiceIdx;
+        }
+    }
+
     // --- TTS Engine ---
 
     togglePlayback() {
@@ -363,10 +447,44 @@ class LuminaApp {
     }
 
     loadVoices() {
-        this.voices = this.synth.getVoices().filter(v => v.lang.includes('en'));
-        this.voiceSelect.innerHTML = this.voices.map((v, i) => 
-            `<option value="${i}">${v.name}</option>`
-        ).join('');
+        const allVoices = this.synth.getVoices();
+        this.voices = allVoices; // Keep reference for index matching
+
+        const groups = {
+            'Nigeria': allVoices.filter(v => v.lang.includes('NG')),
+            'United Kingdom': allVoices.filter(v => v.lang.includes('GB')),
+            'United States': allVoices.filter(v => v.lang.includes('US')),
+            'India': allVoices.filter(v => v.lang.includes('IN')),
+            'French': allVoices.filter(v => v.lang.startsWith('fr')),
+            'Italian': allVoices.filter(v => v.lang.startsWith('it')),
+            'Others': allVoices.filter(v => 
+                !v.lang.includes('NG') && !v.lang.includes('GB') && 
+                !v.lang.includes('US') && !v.lang.includes('IN') &&
+                !v.lang.startsWith('fr') && !v.lang.startsWith('it') &&
+                v.lang.startsWith('en')
+            )
+        };
+
+        let html = '';
+        for (const [name, list] of Object.entries(groups)) {
+            if (list.length > 0) {
+                html += `<optgroup label="${name}">`;
+                list.forEach(v => {
+                    const idx = allVoices.indexOf(v);
+                    const gender = v.name.toLowerCase().includes('female') || v.name.toLowerCase().includes('samantha') || v.name.toLowerCase().includes('victoria') ? '♀' : '♂';
+                    html += `<option value="${idx}">${v.name} ${gender}</option>`;
+                });
+                html += `</optgroup>`;
+            }
+        }
+
+        if (!html) {
+            html = allVoices.filter(v => v.lang.startsWith('en')).map((v, i) => 
+                `<option value="${allVoices.indexOf(v)}">${v.name}</option>`
+            ).join('');
+        }
+
+        this.voiceSelect.innerHTML = html;
     }
 
     updateVoice() {
