@@ -1,7 +1,8 @@
-/**
  * Lumina Read - Premium Audio Articles
  * Core Logic & TTS Engine
  */
+
+import { GoogleGenerativeAI } from "@google/generative-ai";
 
 class LuminaApp {
     constructor() {
@@ -46,6 +47,34 @@ class LuminaApp {
         this.langSelect = document.getElementById('langSelect');
         this.translateBtn = document.getElementById('translateBtn');
         this.speedBtn = document.getElementById('speedBtn');
+        
+        // Studio & AI Elements
+        this.studioTabBtn = document.getElementById('studioTabBtn');
+        this.studioInputContainer = document.getElementById('studioInputContainer');
+        this.studioStatus = document.getElementById('studioStatus');
+        this.configureAiBtn = document.getElementById('configureAiBtn');
+        this.studioActions = document.getElementById('studioActions');
+        this.overlayMsg = document.getElementById('overlayMsg');
+        
+        this.aiSidebar = document.getElementById('aiSidebar');
+        this.aiChatHistory = document.getElementById('aiChatHistory');
+        this.aiInput = document.getElementById('aiInput');
+        this.sendAiBtn = document.getElementById('sendAiBtn');
+        this.closeAiSidebar = document.getElementById('closeAiSidebar');
+        
+        this.aiModal = document.getElementById('aiModal');
+        this.apiKeyInput = document.getElementById('apiKeyInput');
+        this.saveAiBtn = document.getElementById('saveAiBtn');
+        this.cancelAiBtn = document.getElementById('cancelAiBtn');
+        
+        this.genPodcastBtn = document.getElementById('genPodcastBtn');
+        this.genSummaryBtn = document.getElementById('genSummaryBtn');
+        this.genBrainstormBtn = document.getElementById('genBrainstormBtn');
+
+        this.apiKey = localStorage.getItem('lumina_api_key') || '';
+        this.ai = null;
+        if (this.apiKey) this.initAi();
+
         this.libraryList = document.getElementById('libraryList');
         this.clearLibraryBtn = document.getElementById('clearLibrary');
         this.toast = document.getElementById('toast');
@@ -71,6 +100,19 @@ class LuminaApp {
         this.browseBtn.addEventListener('click', () => this.fileInput.click());
         this.fileInput.addEventListener('change', (e) => this.handleFileSelect(e));
         this.uploadBtn.addEventListener('click', () => this.handleFileUpload());
+        
+        // AI Handlers
+        this.configureAiBtn.addEventListener('click', () => this.toggleModal(this.aiModal, true));
+        this.cancelAiBtn.addEventListener('click', () => this.toggleModal(this.aiModal, false));
+        this.saveAiBtn.addEventListener('click', () => this.saveApiKey());
+        
+        this.genPodcastBtn.addEventListener('click', () => this.handleStudioAction('podcast'));
+        this.genSummaryBtn.addEventListener('click', () => this.handleStudioAction('summary'));
+        this.genBrainstormBtn.addEventListener('click', () => this.handleStudioAction('brainstorm'));
+        
+        this.sendAiBtn.addEventListener('click', () => this.handleAiChat());
+        this.aiInput.addEventListener('keypress', (e) => e.key === 'Enter' && this.handleAiChat());
+        this.closeAiSidebar.addEventListener('click', () => this.aiSidebar.classList.remove('open'));
         
         // Translation
         this.translateBtn.addEventListener('click', () => this.handleTranslate());
@@ -197,11 +239,20 @@ class LuminaApp {
         this.playerAuthor.textContent = article.byline;
         this.totalTime.textContent = `${article.readingTime}:00`;
         
+        // Show Studio Actions if in Studio mode
+        this.updateStudioVisibility();
+
         // Stop current speech
         this.stopSpeech();
         
         // Scroll to top
         document.querySelector('.reader-view').scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    updateStudioVisibility() {
+        const isStudio = document.querySelector('.tab-btn[data-mode="studio"]').classList.contains('active');
+        this.studioActions.style.display = isStudio ? 'grid' : 'none';
+        this.articleContent.style.display = isStudio && this.currentArticle.isStudioContent ? 'block' : (isStudio ? 'none' : 'block');
     }
 
     // --- File Handling ---
@@ -210,6 +261,8 @@ class LuminaApp {
         this.tabBtns.forEach(btn => btn.classList.toggle('active', btn.dataset.mode === mode));
         this.linkInputContainer.style.display = mode === 'link' ? 'flex' : 'none';
         this.fileInputContainer.style.display = mode === 'file' ? 'flex' : 'none';
+        this.studioInputContainer.style.display = mode === 'studio' ? 'flex' : 'none';
+        this.updateStudioVisibility();
     }
 
     handleFileSelect(e) {
@@ -277,6 +330,118 @@ class LuminaApp {
         const arrayBuffer = await file.arrayBuffer();
         const result = await mammoth.extractRawText({ arrayBuffer });
         return result.value;
+    }
+
+    // --- Lumina Studio (AI) ---
+
+    initAi() {
+        try {
+            const genAI = new GoogleGenerativeAI(this.apiKey);
+            this.ai = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+            this.studioStatus.textContent = "AI Connected. Select an article to begin.";
+            this.studioStatus.style.color = "var(--accent)";
+        } catch (e) {
+            this.showToast("Failed to initialize AI");
+        }
+    }
+
+    saveApiKey() {
+        const key = this.apiKeyInput.value.trim();
+        if (!key) return;
+        localStorage.setItem('lumina_api_key', key);
+        this.apiKey = key;
+        this.initAi();
+        this.toggleModal(this.aiModal, false);
+        this.showToast("API Key saved successfully!");
+    }
+
+    toggleModal(modal, show) {
+        modal.classList.toggle('open', show);
+    }
+
+    async handleStudioAction(type) {
+        if (!this.ai) return this.toggleModal(this.aiModal, true);
+        if (!this.currentArticle) return this.showToast("Extract an article first");
+
+        this.overlayMsg.textContent = `Generating ${type}...`;
+        this.translateOverlay.style.display = 'flex';
+        
+        try {
+            let prompt = "";
+            if (type === 'podcast') {
+                prompt = `You are a podcast script writer. Create a 2-person conversational dialogue between "HOST" and "EXPERT" based on the following text. Make it engaging and easy to listen to. Format the output exactly like this:
+                HOST: [message]
+                EXPERT: [message]
+                ...
+                Text: ${this.currentArticle.textContent.slice(0, 5000)}`;
+            } else if (type === 'summary') {
+                prompt = `Summarize the key points of this text into a high-level executive summary with bullet points. Text: ${this.currentArticle.textContent.slice(0, 5000)}`;
+            } else if (type === 'brainstorm') {
+                prompt = `Based on this text, generate 5 creative ideas or follow-up research questions that a curious person would find interesting. Text: ${this.currentArticle.textContent.slice(0, 5000)}`;
+            }
+
+            const result = await this.ai.generateContent(prompt);
+            const response = await result.response;
+            const text = response.text();
+
+            if (type === 'podcast') {
+                this.displayPodcastScript(text);
+            } else {
+                this.currentArticle.content = `<div class="ai-generated"><h3>Lumina ${type.toUpperCase()}</h3>${text.split('\n').map(l => `<p>${l}</p>`).join('')}</div>`;
+                this.currentArticle.isStudioContent = true;
+                this.displayArticle(this.currentArticle);
+            }
+        } catch (e) {
+            this.showToast("AI generation failed: " + e.message);
+        } finally {
+            this.translateOverlay.style.display = 'none';
+        }
+    }
+
+    displayPodcastScript(script) {
+        const lines = script.split('\n').filter(l => l.includes(':'));
+        const html = lines.map((line, i) => {
+            const [speaker, ...msgParts] = line.split(':');
+            const msg = msgParts.join(':').trim();
+            return `
+                <div class="script-line" id="line-${i}">
+                    <span class="script-speaker">${speaker}</span>
+                    <span class="script-msg">${msg}</span>
+                </div>
+            `;
+        }).join('');
+
+        this.currentArticle.content = `<h3>🎙️ Lumina Podcast</h3>${html}`;
+        this.currentArticle.isStudioContent = true;
+        this.currentArticle.isPodcast = true;
+        this.currentArticle.scriptLines = lines;
+        this.displayArticle(this.currentArticle);
+    }
+
+    async handleAiChat() {
+        const msg = this.aiInput.value.trim();
+        if (!msg || !this.ai) return;
+
+        this.appendMsg('user', msg);
+        this.aiInput.value = '';
+
+        try {
+            const prompt = `Context: ${this.currentArticle?.textContent.slice(0, 3000) || "No document loaded"}. Question: ${msg}`;
+            const result = await this.ai.generateContent(prompt);
+            const response = await result.response;
+            this.appendMsg('bot', response.text());
+        } catch (e) {
+            this.appendMsg('bot', "Sorry, I encountered an error.");
+        }
+    }
+
+    appendMsg(type, text) {
+        const div = document.createElement('div');
+        div.className = `ai-msg ${type}`;
+        div.textContent = text;
+        this.aiChatHistory.appendChild(div);
+        this.aiChatHistory.scrollTop = this.aiChatHistory.scrollHeight;
+        if (type === 'user') this.aiSidebar.classList.add('open');
     }
 
     // --- Translation ---
@@ -385,6 +550,11 @@ class LuminaApp {
             return;
         }
 
+        if (this.currentArticle.isPodcast) {
+            this.playPodcast();
+            return;
+        }
+
         this.stopSpeech();
 
         // Split text into paragraphs to avoid long utterance issues
@@ -425,6 +595,44 @@ class LuminaApp {
         };
 
         this.synth.speak(this.utterance);
+    }
+
+    async playPodcast() {
+        this.isPlaying = true;
+        this.updatePlayerUI();
+        
+        const lines = this.currentArticle.scriptLines;
+        for (let i = 0; i < lines.length; i++) {
+            if (!this.isPlaying) break;
+            
+            const [speaker, ...msgParts] = lines[i].split(':');
+            const msg = msgParts.join(':').trim();
+            
+            // Highlight current line
+            document.querySelectorAll('.script-line').forEach(l => l.classList.remove('active'));
+            const lineEl = document.getElementById(`line-${i}`);
+            if (lineEl) {
+                lineEl.classList.add('active');
+                lineEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+
+            // Pick voice based on speaker
+            const voices = this.synth.getVoices();
+            const hostVoice = voices.find(v => v.lang.includes('GB') && (v.name.includes('Male') || v.name.includes('Daniel'))) || voices[0];
+            const expertVoice = voices.find(v => v.lang.includes('US') && (v.name.includes('Female') || v.name.includes('Samantha'))) || voices[1];
+
+            const utt = new SpeechSynthesisUtterance(msg);
+            utt.voice = speaker.toUpperCase().includes('HOST') ? hostVoice : expertVoice;
+            utt.rate = this.rate;
+
+            await new Promise(resolve => {
+                utt.onend = resolve;
+                this.synth.speak(utt);
+            });
+        }
+        
+        this.isPlaying = false;
+        this.updatePlayerUI();
     }
 
     pauseSpeech() {

@@ -12,7 +12,14 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Playfair+Display:ital,wght@0,700;1,700&display=swap" rel="stylesheet">
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
     
-    <!-- Readability & Parsers -->
+    <!-- AI & Parsers -->
+    <script type="importmap">
+      {
+        "imports": {
+          "@google/generative-ai": "https://esm.run/@google/generative-ai"
+        }
+      }
+    </script>
     <script src="https://cdn.jsdelivr.net/npm/@mozilla/readability@0.5.0/Readability.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
@@ -61,6 +68,7 @@
                 <div class="input-mode-tabs">
                     <button class="tab-btn active" data-mode="link"><i class="ph ph-link"></i> Link</button>
                     <button class="tab-btn" data-mode="file"><i class="ph ph-file-arrow-up"></i> File</button>
+                    <button class="tab-btn" data-mode="studio" id="studioTabBtn"><i class="ph ph-microphone-stage"></i> Studio</button>
                 </div>
 
                 <!-- Link Input -->
@@ -85,6 +93,13 @@
                         <i class="ph ph-sparkle"></i>
                     </button>
                 </div>
+
+                <!-- Studio Input (AI Setup) -->
+                <div class="input-container" id="studioInputContainer" style="display: none;">
+                    <i class="ph ph-brain"></i>
+                    <span class="studio-status" id="studioStatus">Connect your Gemini API Key to unlock Studio features</span>
+                    <button id="configureAiBtn" class="btn-ghost-input">Configure AI</button>
+                </div>
             </header>
 
             <section class="reader-view" id="readerView">
@@ -106,7 +121,7 @@
                 <article class="article-display" id="articleDisplay" style="display: none;">
                     <div id="translateOverlay" class="translate-overlay" style="display: none;">
                         <i class="ph ph-magic-wand animate-pulse"></i>
-                        <p>Translating article...</p>
+                        <p id="overlayMsg">Translating article...</p>
                     </div>
                     <div class="article-meta">
                         <span id="articleSource" class="source-tag">source.com</span>
@@ -115,6 +130,25 @@
                     <h1 id="articleTitle" class="article-title">The Future of Productivity is Audio</h1>
                     <div id="articleContent" class="article-text">
                         <!-- Content goes here -->
+                    </div>
+
+                    <!-- Studio Actions -->
+                    <div class="studio-actions" id="studioActions" style="display: none;">
+                        <div class="action-card" id="genPodcastBtn">
+                            <i class="ph ph-microphone-stage"></i>
+                            <h4>Generate Podcast</h4>
+                            <p>Turn this article into a 2-person dialogue.</p>
+                        </div>
+                        <div class="action-card" id="genSummaryBtn">
+                            <i class="ph ph-list-bullets"></i>
+                            <h4>Key Insights</h4>
+                            <p>Extract the most important takeaways.</p>
+                        </div>
+                        <div class="action-card" id="genBrainstormBtn">
+                            <i class="ph ph-lightbulb"></i>
+                            <h4>Brainstorm</h4>
+                            <p>Generate 5 creative ideas based on this text.</p>
+                        </div>
                     </div>
                 </article>
             </section>
@@ -181,9 +215,37 @@
         </main>
     </div>
 
-    <!-- Notifications -->
-    <div id="toast" class="toast"></div>
+    <!-- AI Sidebar -->
+    <div class="ai-sidebar" id="aiSidebar">
+        <div class="ai-sidebar-header">
+            <h3>Lumina AI</h3>
+            <button id="closeAiSidebar"><i class="ph ph-x"></i></button>
+        </div>
+        <div class="ai-chat-history" id="aiChatHistory">
+            <div class="ai-msg bot">Hello! I'm your research assistant. How can I help you with this document?</div>
+        </div>
+        <div class="ai-chat-input">
+            <input type="text" id="aiInput" placeholder="Ask anything about the text...">
+            <button id="sendAiBtn"><i class="ph ph-paper-plane-right"></i></button>
+        </div>
+    </div>
 
-    <script src="app.js"></script>
+    <!-- AI Config Modal -->
+    <div class="modal-overlay" id="aiModal">
+        <div class="modal-content">
+            <h3>Configure Lumina AI</h3>
+            <p>Enter your Google Gemini API Key. Your key is stored locally in your browser and never sent to our servers.</p>
+            <input type="password" id="apiKeyInput" placeholder="Enter Gemini API Key...">
+            <div class="modal-footer">
+                <a href="https://aistudio.google.com/app/apikey" target="_blank">Get a free key here</a>
+                <div class="modal-btns">
+                    <button class="btn-ghost" id="cancelAiBtn">Cancel</button>
+                    <button class="btn-primary" id="saveAiBtn">Save Key</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script type="module" src="app.js"></script>
 </body>
 </html>
