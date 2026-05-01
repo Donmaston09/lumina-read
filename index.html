@@ -13,13 +13,6 @@
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
     
     <!-- AI & Parsers -->
-    <script type="importmap">
-      {
-        "imports": {
-          "@google/generative-ai": "https://esm.run/@google/generative-ai"
-        }
-      }
-    </script>
     <script src="https://cdn.jsdelivr.net/npm/@mozilla/readability@0.5.0/Readability.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
@@ -245,6 +238,9 @@
             </div>
         </div>
     </div>
+
+    <!-- Notifications -->
+    <div id="toast" class="toast"></div>
 
     <script type="module" src="app.js"></script>
 </body>

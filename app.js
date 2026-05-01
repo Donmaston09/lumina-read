@@ -2,10 +2,19 @@
  * Core Logic & TTS Engine
  */
 
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import { GoogleGenerativeAI } from "https://esm.run/@google/generative-ai";
 
 class LuminaApp {
     constructor() {
+        try {
+            this.setupApp();
+        } catch (e) {
+            console.error("Lumina Critical Init Error:", e);
+            alert("App failed to initialize: " + e.message);
+        }
+    }
+
+    setupApp() {
         this.currentArticle = null;
         this.library = JSON.parse(localStorage.getItem('lumina_library')) || [];
         this.synth = window.speechSynthesis;
@@ -79,6 +88,8 @@ class LuminaApp {
         this.clearLibraryBtn = document.getElementById('clearLibrary');
         this.toast = document.getElementById('toast');
 
+        // Add a global notification if successful
+        console.log("Lumina Logic Initialized");
         this.init();
     }
 
@@ -113,10 +124,21 @@ class LuminaApp {
         this.sendAiBtn.addEventListener('click', () => this.handleAiChat());
         this.aiInput.addEventListener('keypress', (e) => e.key === 'Enter' && this.handleAiChat());
         this.closeAiSidebar.addEventListener('click', () => this.aiSidebar.classList.remove('open'));
+        if (this.configureAiBtn) this.configureAiBtn.addEventListener('click', () => this.toggleModal(this.aiModal, true));
+        if (this.cancelAiBtn) this.cancelAiBtn.addEventListener('click', () => this.toggleModal(this.aiModal, false));
+        if (this.saveAiBtn) this.saveAiBtn.addEventListener('click', () => this.saveApiKey());
+        
+        if (this.genPodcastBtn) this.genPodcastBtn.addEventListener('click', () => this.handleStudioAction('podcast'));
+        if (this.genSummaryBtn) this.genSummaryBtn.addEventListener('click', () => this.handleStudioAction('summary'));
+        if (this.genBrainstormBtn) this.genBrainstormBtn.addEventListener('click', () => this.handleStudioAction('brainstorm'));
+        
+        if (this.sendAiBtn) this.sendAiBtn.addEventListener('click', () => this.handleAiChat());
+        if (this.aiInput) this.aiInput.addEventListener('keypress', (e) => e.key === 'Enter' && this.handleAiChat());
+        if (this.closeAiSidebar) this.closeAiSidebar.addEventListener('click', () => this.aiSidebar.classList.remove('open'));
         
         // Translation
-        this.translateBtn.addEventListener('click', () => this.handleTranslate());
-        this.langSelect.addEventListener('change', () => {
+        if (this.translateBtn) this.translateBtn.addEventListener('click', () => this.handleTranslate());
+        if (this.langSelect) this.langSelect.addEventListener('change', () => {
             if (this.langSelect.value === 'en') {
                 if (this.currentArticle && this.currentArticle.originalText) {
                     this.restoreOriginal();
@@ -125,10 +147,10 @@ class LuminaApp {
                 this.handleTranslate();
             }
         });
-        this.playPauseBtn.addEventListener('click', () => this.togglePlayback());
-        this.speedBtn.addEventListener('click', () => this.cycleSpeed());
-        this.clearLibraryBtn.addEventListener('click', () => this.clearLibrary());
-        this.voiceSelect.addEventListener('change', () => this.updateVoice());
+        if (this.playPauseBtn) this.playPauseBtn.addEventListener('click', () => this.togglePlayback());
+        if (this.speedBtn) this.speedBtn.addEventListener('click', () => this.cycleSpeed());
+        if (this.clearLibraryBtn) this.clearLibraryBtn.addEventListener('click', () => this.clearLibrary());
+        if (this.voiceSelect) this.voiceSelect.addEventListener('change', () => this.updateVoice());
         
         // Rewind / Skip
         document.getElementById('rewindBtn').addEventListener('click', () => this.skip(-10));
@@ -832,6 +854,4 @@ class LuminaApp {
 }
 
 // Initialize App
-document.addEventListener('DOMContentLoaded', () => {
-    window.lumina = new LuminaApp();
-});
+window.lumina = new LuminaApp();
